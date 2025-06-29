@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+pytz
+pandas
+openpyxl
+google-generativeai
+aiosqlite

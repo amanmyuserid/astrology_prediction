@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astrology Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Apply Inter font globally */
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Hide main body scrollbar */
+            height: 100vh; /* Ensure body takes full viewport height */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* Center content vertically */
+            padding: 1rem; /* Overall padding */
+        }
+        /* Main application container to fill available height */
+        .app-container {
+            flex: 1; /* Allow it to grow and shrink */
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 2rem); /* Subtract body padding */
+        }
+        /* Custom height for columns to ensure internal scrolling */
+        .column-content {
+            height: calc(100% - 60px); /* Subtract header/subheader height from column's parent height */
+            overflow-y: auto; /* Enable vertical scrolling for content within columns */
+            padding-right: 10px; /* Space for scrollbar */
+        }
+        /* Style scrollbar for better appearance (optional, cross-browser compatibility varies) */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Message area positioning */
+        #message-area {
+            position: fixed; 
+            top: 1rem;     
+            left: 1rem;    
+            z-index: 1000;   
+            width: auto;     
+            max-width: 90%; 
+            min-width: 250px;
+            box-sizing: border-box; 
+            transition: opacity 0.3s ease-in-out;
+        }
+        #message-area.hidden {
+            display: none; 
+        }
+
+        /* Button group for consistent layout */
+        .button-group {
+            position: relative; 
+            display: flex;
+            flex-direction: column; /* Ensure button stays up */
+            align-items: center; 
+            width: 100%; 
+        }
+        .button-group button {
+            width: 100%; 
+        }
+
+        /* Chat history container for flex layout */
+        #chat-history-display {
+            display: flex;
+            flex-direction: column; /* Stack messages vertically */
+            gap: 8px; /* Space between messages */
+            width: 100%; 
+        }
+
+        /* Specific styles for user and system messages */
+        .message-div {
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            max-width: 80%; /* Messages don't take full width */
+        }
+
+        .message-div.user {
+            background-color: #e0f2fe; /* Light blue for user messages */
+            color: #1e40af; /* Darker blue text */
+            align-self: flex-end; /* Align to the right */
+            margin-left: auto; /* Push to the right */
+        }
+
+        .message-div.system {
+            background-color: #f3f4f6; /* Light gray for system messages */
+            color: #374151; /* Darker gray text */
+            align-self: flex-start; /* Align to the left */
+            margin-right: auto; /* Push to the left */
+        }
+
+        .message-div.awaiting {
+            background-color: #fafafa;
+            color: #6b7280;
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            align-self: flex-start;
+            margin-right: auto;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-indigo-100">
+    <div id="message-area" class="mb-4 hidden">
+        <div id="message-content" class="px-4 py-3 rounded-md relative">
+            <strong id="message-type-bold" class="font-bold"></strong>
+            <span id="message-text" class="block sm:inline"></span>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-2xl p-6 md:p-8 w-full max-w-6xl border border-gray-200 app-container">
+        <h1 class="text-center text-3xl md:text-4xl font-extrabold text-gray-800 mb-4 tracking-tight">
+            🌌 Astrology Chatbot
+        </h1>
+        
+        <div class="flex flex-1 space-x-4 overflow-hidden">
+            <div class="flex-1 bg-gray-50 rounded-lg p-4 flex flex-col">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Your Input</h2>
+                <div class="column-content custom-scrollbar">
+                    <form id="chat-form" class="space-y-4 flex flex-col h-full">
+                        <div>
+                            <label for="mob-input" class="block text-sm font-medium text-gray-700 mb-1">
+                                Mobile Number (as ID)
+                            </label>
+                            <input type="text" id="mob-input" name="mob" required
+                                   class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm transition duration-150 ease-in-out"
+                                   placeholder="e.g., 9876543210">
+                        </div>
+                        <div class="flex-1 flex flex-col">
+                            <label for="question-input" class="block text-sm font-medium text-gray-700 mb-1">
+                                Your Main Question
+                            </label>
+                            <textarea id="question-input" name="user_question" required rows="6"
+                                     class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm transition duration-150 ease-in-out resize-none flex-1"
+                                     placeholder="e.g., What does my future hold?"></textarea>
+                        </div>
+                        <div class="button-group"> 
+                            <button type="submit" id="submit-chat-button"
+                                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200 ease-in-out transform hover:-translate-y-0.5">
+                                Send Message
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="flex-1 bg-gray-50 rounded-lg p-4 flex flex-col">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Chatbot Responses</h2>
+                <div class="column-content custom-scrollbar">
+
+                    <div id="user-details-form-container" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-3">Please Provide Your Details (Initial Setup)</h3>
+                        <p class="text-sm text-blue-700 mb-3">Date of Birth format should be YYYY/MM/DD (e.g., 1990/01/15)</p>
+                        <form id="user-details-form" class="space-y-3">
+                        </form>
+                    </div>
+
+                    <div id="custom-input-form-container" class="hidden bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <h3 id="custom-input-form-title" class="text-lg font-semibold text-green-800 mb-3">Backend Needs More Info!</h3>
+                        <form id="custom-dynamic-input-form" class="space-y-3">
+                        </form>
+                    </div>
+
+                    <div id="chat-history-display" class="flex-1 pt-2">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_WS_URL = 'ws://127.0.0.1:8000/ws'; // WebSocket URL
+        const MESSAGE_DISPLAY_DURATION = 3000;
+
+        // --- WebSocket instance ---
+        let websocket = null;
+        let connectedMobValue = ''; // Stores the mobile number the *current* WebSocket is connected with
+
+        // DOM Element References
+        const chatForm = document.getElementById('chat-form');
+        const mobInput = document.getElementById('mob-input');
+        const questionInput = document.getElementById('question-input');
+        const submitChatButton = document.getElementById('submit-chat-button');
+        const messageArea = document.getElementById('message-area');
+        const messageText = document.getElementById('message-text');
+        const messageContent = document.getElementById('message-content');
+        const messageTypeBold = document.getElementById('message-type-bold');
+        const userDetailsFormContainer = document.getElementById('user-details-form-container');
+        const userDetailsForm = document.getElementById('user-details-form');
+        const customInputFormContainer = document.getElementById('custom-input-form-container');
+        const customInputFormTitle = document.getElementById('custom-input-form-title');
+        const customDynamicInputForm = document.getElementById('custom-dynamic-input-form');
+        const chatHistoryDisplay = document.getElementById('chat-history-display');
+
+        // State Variables
+        let chatHistory = [];
+        let currentMobValue = localStorage.getItem('chatMob') || '';
+        let currentUserQuestion = localStorage.getItem('chatQuestion') || '';
+
+        // --- Utility Functions ---
+
+        function saveInputState() {
+            localStorage.setItem('chatMob', mobInput.value.trim());
+            localStorage.setItem('chatQuestion', questionInput.value);
+        }
+
+        function loadInputState() {
+            mobInput.value = localStorage.getItem('chatMob') || '';
+            questionInput.value = localStorage.getItem('chatQuestion') || '';
+            currentMobValue = mobInput.value;
+            currentUserQuestion = questionInput.value;
+        }
+
+        function showMessage(type, message) {
+            messageArea.classList.remove('hidden');
+            if (type === 'error') {
+                messageContent.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative';
+                messageTypeBold.textContent = 'Error! ';
+                messageText.textContent = message;
+            } else {
+                messageContent.className = 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md relative';
+                messageTypeBold.textContent = 'Info! ';
+                messageText.textContent = message;
+            }
+            setTimeout(() => messageArea.classList.add('hidden'), MESSAGE_DISPLAY_DURATION);
+        }
+
+        function setProcessingState(isProcessing, buttonElement = submitChatButton, buttonText = 'Send Message') {
+            if (isProcessing) {
+                buttonElement.disabled = true;
+                buttonElement.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                `;
+            } else {
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = buttonText;
+            }
+        }
+
+        function renderChatHistory() {
+            chatHistoryDisplay.innerHTML = '';
+
+            chatHistory.forEach(entry => {
+                const messageDiv = document.createElement('div');
+                let messageContentFormatted = typeof entry.message === 'string'
+                    ? entry.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
+                    : String(entry.message);
+
+                if (entry.message === 'Awaiting response...') {
+                    messageDiv.className = 'message-div awaiting';
+                    messageDiv.innerHTML = `
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Awaiting response...
+                    `;
+                } else {
+                    messageDiv.className = 'message-div system';
+                    messageDiv.innerHTML = messageContentFormatted;
+                }
+
+                chatHistoryDisplay.appendChild(messageDiv);
+            });
+
+            chatHistoryDisplay.scrollTop = chatHistoryDisplay.scrollHeight;
+        }
+        
+        function hideAllDynamicForms() {
+            userDetailsFormContainer.classList.add('hidden');
+            customInputFormContainer.classList.add('hidden');
+            userDetailsForm.innerHTML = '';
+            customDynamicInputForm.innerHTML = '';
+        }
+
+        // --- WebSocket Connection and Event Handlers ---
+
+        function connectWebSocket() {
+            const mob = mobInput.value.trim();
+            if (!mob) {
+                showMessage('error', 'Please enter your mobile number to connect.');
+                return;
+            }
+            currentMobValue = mob;
+            
+            // --- FIX START ---
+            // If the connection is already open with the correct user,
+            // just send the new message directly.
+            if (websocket && websocket.readyState === WebSocket.OPEN && connectedMobValue === currentMobValue) {
+                console.log("WebSocket already open. Sending new query.");
+                // The `currentUserQuestion` global variable was updated by the submit handler.
+                sendMessageToBackend({
+                    type: "chat_message",
+                    mob: currentMobValue,
+                    user_question: currentUserQuestion
+                });
+                return websocket; // Exit the function.
+            }
+            // --- FIX END ---
+
+            // This part below will now only run for the very first connection,
+            // or if a reconnection is needed.
+            if (websocket) {
+                websocket.close();
+            }
+
+            const wsUrlWithMob = `${API_WS_URL}?mob=${currentMobValue}`;
+            websocket = new WebSocket(wsUrlWithMob);
+            connectedMobValue = currentMobValue;
+
+            // This onopen handler is perfect for sending the *initial* message on a *new* connection.
+            websocket.onopen = () => {
+                console.log('WebSocket connected!');
+                showMessage('info', 'Connected to chatbot!');
+                setProcessingState(false);
+                
+                // This logic is still needed for the first message on a brand new connection.
+                if (currentUserQuestion) {
+                    sendMessageToBackend({
+                        type: "chat_message",
+                        mob: currentMobValue,
+                        user_question: currentUserQuestion
+                    });
+                }
+            };
+
+            websocket.onmessage = (event) => {
+                console.log('WebSocket message received:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    handleBackendMessage(data);
+                } catch (e) {
+                    console.error("Failed to parse WebSocket message:", e, event.data);
+                    showMessage('error', 'Received invalid data from server.');
+                }
+            };
+
+            websocket.onerror = (event) => {
+                console.error('WebSocket error:', event);
+                showMessage('error', 'WebSocket connection error.');
+                setProcessingState(false);
+            };
+
+            websocket.onclose = (event) => {
+                console.log('WebSocket disconnected:', event);
+                showMessage('error', `Disconnected from chatbot. Code: ${event.code}`);
+                connectedMobValue = '';
+            };
+            return websocket;
+        }
+
+        function sendMessageToBackend(messageObject) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(JSON.stringify(messageObject));
+                console.log("Message sent to backend:", messageObject);
+            } else {
+                showMessage('error', 'Not connected. Reconnecting...');
+                // The connectWebSocket function will attempt to reconnect
+                // and its onopen handler will send the message.
+                connectWebSocket(); 
+                // We add a small delay and retry to give the connection time to establish.
+                // This part is a fallback.
+                setTimeout(() => {
+                    if (websocket && websocket.readyState === WebSocket.OPEN) {
+                        websocket.send(JSON.stringify(messageObject));
+                        console.log("Message sent to backend (retried):", messageObject);
+                    } else {
+                        showMessage('error', 'Failed to send message. Please try again.');
+                        setProcessingState(false);
+                    }
+                }, 1000);
+            }
+        }
+        
+        function addAwaitingResponse() {
+            const awaitingMessageIndex = chatHistory.findIndex(entry => entry.message === 'Awaiting response...');
+            if (awaitingMessageIndex === -1) {
+                chatHistory.push({ sender: 'system', message: 'Awaiting response...' });
+                renderChatHistory();
+            }
+        }
+
+        function removeAwaitingResponse() {
+            const awaitingMessageIndex = chatHistory.findIndex(entry => entry.message === 'Awaiting response...');
+            if (awaitingMessageIndex !== -1) {
+                chatHistory.splice(awaitingMessageIndex, 1);
+            }
+        }
+        
+        // --- Central handler for messages from the Backend via WebSocket ---
+        function handleBackendMessage(data) {
+            setProcessingState(false);
+            removeAwaitingResponse();
+            
+            const type = data.type;
+
+            switch (type) {
+                case "status_update":
+                    if (data.status === "user_details_needed") {
+                        hideAllDynamicForms();
+                        showMessage('info', data.message);
+                        renderDynamicForm(userDetailsFormContainer, userDetailsForm, data.action_needed_fields, 'save_user_details', 'Save Details & Get Reading');
+                    } else if (data.status === "ready_for_chat") {
+                        hideAllDynamicForms();
+                        showMessage('info', data.message);
+                        chatHistory = []; // Clear history for the new session
+                    } else if (data.status === "details_saved" || data.status === "custom_data_saved") {
+                        showMessage('info', data.message);
+                    }
+                    break;
+
+                case "llm_response":
+                    hideAllDynamicForms();
+                    if (data.display_message_in_chat !== false) {
+                        chatHistory.push({ sender: 'system', message: data.message });
+                    }
+                    break;
+
+                case "request_custom_data":
+                    hideAllDynamicForms();
+                    customInputFormTitle.textContent = data.message;
+                    renderDynamicForm(customInputFormContainer, customDynamicInputForm, data.action_needed_fields, 'submit_custom_input', 'Submit');
+                    if (data.display_message_in_chat !== false) {
+                        chatHistory.push({ sender: 'system', message: data.message });
+                    }
+                    break;
+
+                case "error":
+                    showMessage('error', data.message || 'An unknown error occurred.');
+                    chatHistory.push({ sender: 'system', message: `Error: ${data.message || 'Unknown error.'}` });
+                    break;
+
+                default:
+                    console.warn("Unknown message type from backend:", data);
+            }
+            renderChatHistory();
+        }
+        
+        function renderDynamicForm(containerElement, formElement, fieldsData, messageType, buttonText) {
+            formElement.innerHTML = ''; // Clear previous form content
+            
+            fieldsData.forEach(fieldDef => {
+                const { id: fieldId, label: fieldLabel, required: fieldRequired } = fieldDef;
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label for="${formElement.id}_${fieldId}" class="block text-sm font-medium text-gray-700 mb-1">${fieldLabel}</label>
+                    <input type="text" id="${formElement.id}_${fieldId}" name="${fieldId}" ${fieldRequired ? 'required' : ''}
+                        class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm transition"
+                        placeholder="${fieldRequired ? '(Required)' : '(Optional)'}">
+                `;
+                formElement.appendChild(div);
+            });
+
+            const submitButton = document.createElement('button');
+            submitButton.type = 'submit';
+            submitButton.className = 'w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition transform hover:-translate-y-0.5 mt-4';
+            submitButton.textContent = buttonText;
+            formElement.appendChild(submitButton);
+
+            formElement.onsubmit = (e) => {
+                e.preventDefault();
+                const formData = new FormData(formElement);
+                const data = { mob: currentMobValue };
+                
+                if (messageType === 'save_user_details') {
+                    data.type = 'save_user_details';
+                    // This logic assumes field IDs match the expected keys in the backend `UserDetails` model.
+                    fieldsData.forEach(field => {
+                        data[field.id] = formData.get(field.id) || '';
+                    });
+                } else if (messageType === 'submit_custom_input') {
+                    data.type = 'submit_custom_input';
+                    data.custom_data = {};
+                    fieldsData.forEach(field => {
+                        data.custom_data[field.id] = formData.get(field.id) || '';
+                    });
+                }
+                
+                addAwaitingResponse();
+                hideAllDynamicForms();
+                sendMessageToBackend(data);
+            };
+            
+            containerElement.classList.remove('hidden');
+        }
+
+        // --- Event Listeners ---
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            currentUserQuestion = questionInput.value;
+
+            if (!mobInput.value.trim() || !currentUserQuestion) {
+                showMessage('error', 'Please provide both mobile number and a question.');
+                return;
+            }
+
+            setProcessingState(true);
+            saveInputState();
+            chatHistory = [];
+            addAwaitingResponse();
+            
+            // This function now correctly handles both new and existing connections.
+            connectWebSocket();
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadInputState();
+        });
+
+    </script>
+</body>
+</html>
